@@ -564,7 +564,7 @@ function drawTitle(c: Ctx, st: GameState): void {
   drawCredit(c);
 }
 
-function drawSelect(c: Ctx, st: GameState): void {
+function drawSelect(c: Ctx, st: GameState, net: NetInfo | null = null): void {
   drawStage(c, rs.tick);
   c.save();
   c.textAlign = 'center';
@@ -629,18 +629,26 @@ function drawSelect(c: Ctx, st: GameState): void {
   c.textAlign = 'center';
   c.font = `600 13px ${FONT}`;
   c.fillStyle = '#8a9aaa';
-  if (st.mode === 'vs') {
+  if (net) {
+    // オンライン: 自分の側だけを操作。両者とも 1P キー（A/D＋J）。
+    const you = net.localSide === 0 ? '左 (1P・シアン枠)' : '右 (2P・オレンジ枠)';
+    c.fillStyle = '#7ef0a8';
+    c.fillText(`ONLINE — あなたは ${you}`, W / 2, 372);
+    c.fillStyle = '#8a9aaa';
+    c.fillText('A / D で選択、J（攻撃）で決定', W / 2, 392);
+  } else if (st.mode === 'vs') {
     c.fillText('1P: A/D + J で決定　　2P: ←/→ + テンキー1 で決定', W / 2, 390);
   } else {
     c.fillText('A/D で選択 — J/K/L で決定（CPU は隣のキャラを使用）', W / 2, 390);
   }
   const p1c = charAt(st.sel[0]);
+  const youMark = (side: 0 | 1): string => (net && net.localSide === side ? ' ◀あなた' : '');
   c.font = `500 12px ${FONT}`;
   c.fillStyle = '#6a8090';
-  c.fillText(`1P: ${CHARS[p1c].name}${st.selDone[0] ? ' ✔' : ''}`, W / 2 - 120, 415);
+  c.fillText(`1P: ${CHARS[p1c].name}${st.selDone[0] ? ' ✔' : ''}${youMark(0)}`, W / 2 - 130, 414);
   if (st.mode === 'vs') {
     const p2c = charAt(st.sel[1]);
-    c.fillText(`2P: ${CHARS[p2c].name}${st.selDone[1] ? ' ✔' : ''}`, W / 2 + 120, 415);
+    c.fillText(`2P: ${CHARS[p2c].name}${st.selDone[1] ? ' ✔' : ''}${youMark(1)}`, W / 2 + 130, 414);
   }
   c.restore();
   drawCredit(c);
@@ -648,12 +656,15 @@ function drawSelect(c: Ctx, st: GameState): void {
 
 // ---- メイン render ----------------------------------------------------------
 
-export function render(c: Ctx, st: GameState): void {
+/** オンライン対戦時のゲーム内文脈（配線層から渡す）。null=オフライン。 */
+export interface NetInfo { localSide: 0 | 1; roomId: string; stalled: boolean }
+
+export function render(c: Ctx, st: GameState, net: NetInfo | null = null): void {
   rs.tick++;
   c.clearRect(0, 0, W, H);
 
   if (st.status === 'title') { drawTitle(c, st); return; }
-  if (st.status === 'select') { drawSelect(c, st); return; }
+  if (st.status === 'select') { drawSelect(c, st, net); return; }
 
   // 画面シェイク
   c.save();
@@ -712,6 +723,17 @@ export function render(c: Ctx, st: GameState): void {
     c.restore();
   }
 
+  // オンライン対戦の細バナー（select は drawSelect 側が扱うので除外）
+  if (net) {
+    c.save();
+    c.textAlign = 'center';
+    c.font = `700 10px ${FONT}`;
+    c.fillStyle = net.stalled ? '#ff8f5f' : '#7ef0a8';
+    const you = net.localSide === 0 ? '1P (左)' : '2P (右)';
+    c.fillText(`● ONLINE  ルーム ${net.roomId}  あなた=${you}${net.stalled ? '  (通信待ち)' : ''}   ·   Esc で退出`, W / 2, 90);
+    c.restore();
+  }
+
   // 状態オーバーレイ
   c.save();
   c.textAlign = 'center';
@@ -747,16 +769,18 @@ export function render(c: Ctx, st: GameState): void {
     c.fillText(st.roundMsg, 0, 0);
     c.restore();
   } else if (st.status === 'matchEnd') {
-    c.fillStyle = 'rgba(4,8,14,0.6)';
+    c.fillStyle = 'rgba(4,8,14,0.72)';
     c.fillRect(0, 0, W, H);
     const wf = st.fighters[st.winner === 1 ? 1 : 0];
-    c.font = `italic 700 54px ${FONT}`;
+    c.font = `italic 700 48px ${FONT}`;
     c.fillStyle = '#ffd24a';
     c.shadowColor = '#ffaa2a';
     c.shadowBlur = 20;
-    c.fillText(`${CHARS[wf.char].name} WINS!`, W / 2, 200);
+    c.fillText(`${CHARS[wf.char].name} WINS!`, W / 2, 150);
     c.shadowBlur = 0;
-    if (st.statusTimer > 40) {
+    if (st.mode === 'vs') {
+      drawRematchVote(c, st, net);
+    } else if (st.statusTimer > 40) {
       c.font = `600 15px ${FONT}`;
       c.fillStyle = '#c8d4e0';
       c.fillText('攻撃ボタン: リマッチ　　Enter: タイトルへ', W / 2, 260);
@@ -765,4 +789,64 @@ export function render(c: Ctx, st: GameState): void {
   c.restore();
 
   c.restore(); // shake
+}
+
+/** 双方合意の再戦投票 UI（vs）。各サイドが はい/いいえ を選び攻撃で確定。 */
+function drawRematchVote(c: Ctx, st: GameState, net: NetInfo | null): void {
+  c.save();
+  c.textAlign = 'center';
+  c.fillStyle = '#e8eef5';
+  c.font = `700 20px ${FONT}`;
+  c.fillText('もう一度 対戦する？', W / 2, 210);
+
+  const panelY = 250;
+  const drawSide = (side: 0 | 1, cx: number): void => {
+    const isYou = net && net.localSide === side;
+    const label = (side === 0 ? '1P (左)' : '2P (右)') + (isYou ? ' — あなた' : '');
+    c.font = `700 13px ${FONT}`;
+    c.fillStyle = isYou ? '#7ef0a8' : '#9aa6b8';
+    c.fillText(label, cx, panelY - 8);
+    // はい / いいえ の2択
+    const opts = ['はい', 'いいえ'];
+    for (let o = 0; o < 2; o++) {
+      const ox = cx + (o === 0 ? -46 : 46);
+      const sel = st.rematchSel[side] === o;
+      const done = st.rematchDone[side];
+      c.font = `700 16px ${FONT}`;
+      if (done) {
+        // 確定後は選んだ方だけ強調（はい=緑 / いいえ=赤）
+        c.fillStyle = sel ? (o === 0 ? '#7ef0a8' : '#ff8f7a') : 'rgba(120,130,145,0.4)';
+      } else {
+        c.fillStyle = sel ? '#ffd24a' : '#6a7889';
+      }
+      const box = 62, bh = 30;
+      c.save();
+      c.strokeStyle = sel ? (done ? (o === 0 ? '#7ef0a8' : '#ff8f7a') : '#ffd24a') : 'rgba(90,110,130,0.5)';
+      c.lineWidth = sel ? 2 : 1.2;
+      c.strokeRect(ox - box / 2, panelY + 6, box, bh);
+      c.restore();
+      c.fillText(opts[o]!, ox, panelY + 27);
+    }
+    // 確定マーク
+    if (st.rematchDone[side]) {
+      c.font = `700 12px ${FONT}`;
+      c.fillStyle = '#5fd08a';
+      c.fillText('✔ 決定', cx, panelY + 56);
+    } else {
+      c.font = `500 11px ${FONT}`;
+      c.fillStyle = '#7a90a6';
+      c.fillText('選択中…', cx, panelY + 56);
+    }
+  };
+  drawSide(0, W / 2 - 150);
+  drawSide(1, W / 2 + 150);
+
+  c.font = `600 13px ${FONT}`;
+  c.fillStyle = '#8a9aaa';
+  const hint = net ? '← → で選び、攻撃ボタン(J)で決定' : '各自 ← → で選び、攻撃ボタンで決定';
+  c.fillText(hint, W / 2, 340);
+  c.font = `500 11px ${FONT}`;
+  c.fillStyle = '#6a7889';
+  c.fillText('両者「はい」で再戦、どちらかが「いいえ」なら終了', W / 2, 360);
+  c.restore();
 }

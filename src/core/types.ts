@@ -228,4 +228,10 @@ export interface GameState {
   demoPair: number;
   /** タイトルで「オンライン」を選んだ合図（配線層=main.ts がロビーへ遷移して false に戻す）。 */
   enterOnline: boolean;
+  /** 再戦投票（vs のみ）: 各サイドの選択 0=はい / 1=いいえ。 */
+  rematchSel: [number, number];
+  /** 再戦投票の確定フラグ。 */
+  rematchDone: [boolean, boolean];
+  /** 再戦の結果シグナル。'quit'=どちらかが拒否→配線層が終了処理する。 */
+  rematchResult: 'none' | 'quit';
 }

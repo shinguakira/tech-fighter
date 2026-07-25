@@ -34,6 +34,9 @@ export function createGame(seed = 0x1234abcd): GameState {
     modeSel: 0,
     demoPair: 0,
     enterOnline: false,
+    rematchSel: [0, 0],
+    rematchDone: [false, false],
+    rematchResult: 'none',
   };
 }
 
@@ -82,6 +85,9 @@ export function startMatch(st: GameState): void {
   st.roundMsg = '';
   st.aiSide = st.mode === 'cpu' ? 1 : -1;
   st.ai = [mkAi(), mkAi()];
+  st.rematchSel = [0, 0];
+  st.rematchDone = [false, false];
+  st.rematchResult = 'none';
   st.status = 'intro';
   st.statusTimer = INTRO_FRAMES;
 }
@@ -282,19 +288,40 @@ export function step(st: GameState, gi: GameInput): void {
         }
         break;
       }
-      // 少し待ってから入力受付（誤爆防止）
+      // vs（ローカル2P / オンライン）: 双方合意の再戦投票。
+      // 各サイドが ←→ で はい/いいえ を選び、攻撃ボタンで確定。
+      // 両者「はい」で再戦、どちらか「いいえ」なら終了（rematchResult='quit' を配線層が処理）。
+      if (st.mode === 'vs') {
+        if (st.statusTimer > 40) {
+          for (const side of [0, 1] as const) {
+            if (st.rematchDone[side]) continue;
+            const cur = rawIn[side], prev = st.prevIn[side];
+            if (press(cur, prev, 'left')) st.rematchSel[side] = 0;   // はい
+            if (press(cur, prev, 'right')) st.rematchSel[side] = 1;  // いいえ
+            if (anyAttack(cur, prev)) st.rematchDone[side] = true;
+          }
+          if (st.rematchDone[0] && st.rematchDone[1]) {
+            if (st.rematchSel[0] === 0 && st.rematchSel[1] === 0) {
+              // 双方はい → 同カードで再戦
+              st.fighters[0].wins = 0; st.fighters[1].wins = 0;
+              st.fighters[0].meter = 0; st.fighters[1].meter = 0;
+              st.round = 0;
+              st.rematchSel = [0, 0]; st.rematchDone = [false, false];
+              resetRound(st);
+            } else {
+              st.rematchResult = 'quit'; // どちらか拒否 → 終了
+            }
+          }
+        }
+        break;
+      }
+      // cpu モード: 従来通り（攻撃=リマッチ / Enter=タイトル）
       if (st.statusTimer > 40) {
         if (gi.start) {
-          // タイトルへ（モード選択から）
-          const seed = st.rng;
-          const fresh = createGame(seed);
-          Object.assign(st, fresh);
-        } else if (anyAttack(p1, pv) || anyAttack(rawIn[1], st.prevIn[1])) {
-          // 同キャラで即リマッチ
-          st.fighters[0].wins = 0;
-          st.fighters[1].wins = 0;
-          st.fighters[0].meter = 0;
-          st.fighters[1].meter = 0;
+          Object.assign(st, createGame(st.rng));
+        } else if (anyAttack(p1, pv)) {
+          st.fighters[0].wins = 0; st.fighters[1].wins = 0;
+          st.fighters[0].meter = 0; st.fighters[1].meter = 0;
           st.round = 0;
           resetRound(st);
         }

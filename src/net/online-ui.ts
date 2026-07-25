@@ -2,7 +2,7 @@
 // main.ts のループから駆動する。core・描画本体には手を入れない。
 import { W } from '../core/constants';
 import type { GameState, PlayerInput, Status } from '../core/types';
-import { resetRenderState } from '../render/canvas';
+import { resetRenderState, type NetInfo } from '../render/canvas';
 import { connectOnline, type MatchKind, type OnlineHandle } from './online';
 import { NetSession } from './session';
 
@@ -84,6 +84,13 @@ export class OnlineController {
     }
     this.lastTick = this.session.tick(localInput);
     const g = this.session.game;
+    // 再戦投票で「いいえ」が出た（双方合意でない）→ 対戦終了。両者ロビーへ。
+    if (g.rematchResult === 'quit') {
+      this.teardown();
+      this.phase = 'lobby';
+      this.status = '対戦を終了しました';
+      return null;
+    }
     if (g.status !== this.prevStatus) {
       if (g.status === 'intro' && (this.prevStatus === 'select' || this.prevStatus === 'matchEnd')) resetRenderState();
       this.prevStatus = g.status;
@@ -91,19 +98,23 @@ export class OnlineController {
     return g;
   }
 
-  /** 対戦中に描画すべき GameState（無ければ null）。 */
-  get liveGame(): GameState | null {
-    return this.phase === 'playing' ? this.session?.game ?? null : null;
+  /** render() に渡すオンライン文脈（対戦中のみ）。 */
+  netInfo(): NetInfo | null {
+    if (this.phase !== 'playing' || !this.handle) return null;
+    return {
+      localSide: this.handle.localSide as 0 | 1,
+      roomId: this.roomCode || this.handle.roomId,
+      stalled: this.lastTick.stalled,
+    };
   }
 
-  // ---- オーバーレイ描画 ----
+  // ---- オーバーレイ描画（ロビー/接続/エラーのみ。対戦中の表示は render() が担当） ----
   draw(c: CanvasRenderingContext2D): void {
-    if (this.phase === 'closed') return;
+    if (this.phase === 'closed' || this.phase === 'playing') return;
     c.save();
     c.textAlign = 'center';
     if (this.phase === 'lobby' || this.phase === 'error') this.drawLobby(c);
     else if (this.phase === 'connecting') this.drawConnecting(c);
-    else if (this.phase === 'playing') this.drawNetHud(c);
     c.restore();
   }
 
@@ -158,15 +169,5 @@ export class OnlineController {
     }
     c.fillStyle = '#5a6a7a'; c.font = `500 11px ${FONT}`;
     c.fillText('Esc で中止', W / 2, 400);
-  }
-
-  private drawNetHud(c: CanvasRenderingContext2D): void {
-    const side = this.handle?.localSide === 0 ? '1P (左)' : '2P (右)';
-    c.textAlign = 'center';
-    c.fillStyle = this.lastTick.stalled ? '#ff8f5f' : '#7ef0a8';
-    c.font = `700 11px ${FONT}`;
-    c.fillText(`● ONLINE  ルーム ${this.roomCode || this.handle?.roomId || ''}  あなた=${side}${this.lastTick.stalled ? '  (通信待ち)' : ''}`, W / 2, 128);
-    c.fillStyle = '#5a6a7a'; c.font = `500 10px ${FONT}`;
-    c.fillText('Esc で退出', W / 2, 142);
   }
 }

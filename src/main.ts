@@ -38,7 +38,7 @@ function loop(): void {
     const shown = netGame ?? game;
     document.body.classList.toggle('playing', netGame != null && (shown.status === 'play' || shown.status === 'intro'));
     if (netGame) sound.update(netGame);
-    render(ctx!, shown);
+    render(ctx!, shown, online.netInfo());
     online.draw(ctx!);
     drawMuteIndicator();
     requestAnimationFrame(loop);
@@ -48,6 +48,8 @@ function loop(): void {
   step(game, gi);
   // タイトルで「オンライン」決定 → ロビーへ
   if (game.enterOnline) { game.enterOnline = false; online.open(); }
+  // ローカル2P: 再戦投票で「いいえ」→ タイトルへ
+  if (game.mode === 'vs' && game.rematchResult === 'quit') { game = createGame(); prevStatus = game.status; }
   if (game.status !== prevStatus) {
     // 対戦開始時に描画側の持続状態（HPラグ等）をリセット
     if (game.status === 'intro' && (prevStatus === 'select' || prevStatus === 'matchEnd' || prevStatus === 'title')) resetRenderState();

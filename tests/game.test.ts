@@ -98,9 +98,10 @@ describe('game flow', () => {
     expect(timerSec(st)).toBe(98);
   });
 
-  it('matchEnd → Enter でタイトルへ', () => {
+  it('matchEnd(CPU) → Enter でタイトルへ', () => {
     const st = createGame();
     toPlay(st);
+    st.mode = 'cpu';
     st.status = 'matchEnd';
     st.winner = 0;
     st.statusTimer = 50;
@@ -108,17 +109,43 @@ describe('game flow', () => {
     expect(st.status).toBe('title');
   });
 
-  it('matchEnd → 攻撃ボタンでリマッチ（wins リセット）', () => {
+  it('matchEnd(vs) → 双方「はい」で再戦（wins リセット）', () => {
     const st = createGame();
-    toPlay(st);
+    toPlay(st); // mode vs（既定 rematchSel=はい）
     st.fighters[0].wins = 2;
     st.status = 'matchEnd';
     st.winner = 0;
     st.statusTimer = 50;
-    frames(st, 1, GI({ light: true }));
+    frames(st, 1, GI({ light: true }, { light: true })); // 両者「はい」で確定
     expect(st.status).toBe('intro');
     expect(st.fighters[0].wins).toBe(0);
     expect(st.round).toBe(1);
+  });
+
+  it('matchEnd(vs) → 片方が「いいえ」なら quit（終了シグナル）', () => {
+    const st = createGame();
+    toPlay(st);
+    st.status = 'matchEnd';
+    st.winner = 0;
+    st.statusTimer = 50;
+    frames(st, 1, GI({ light: true }, { right: true })); // P1=はい確定 / P2=いいえ選択
+    expect(st.rematchResult).toBe('none'); // まだ片方だけ
+    frames(st, 1, GI({}, { light: true }));              // P2=いいえで確定
+    expect(st.rematchResult).toBe('quit');
+    expect(st.status).toBe('matchEnd'); // 遷移は配線層に委ねる
+  });
+
+  it('matchEnd(vs) → 片方だけ確定では再戦しない（双方合意が必要）', () => {
+    const st = createGame();
+    toPlay(st);
+    st.status = 'matchEnd';
+    st.winner = 0;
+    st.statusTimer = 50;
+    frames(st, 5, GI({ light: true })); // P1 だけ「はい」確定
+    expect(st.status).toBe('matchEnd');
+    expect(st.rematchResult).toBe('none');
+    expect(st.rematchDone[0]).toBe(true);
+    expect(st.rematchDone[1]).toBe(false);
   });
 
   it('決定論: 同じ seed と入力列で状態が完全一致（CPU 戦込み）', () => {
