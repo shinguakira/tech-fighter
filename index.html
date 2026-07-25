@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>TECH FIGHTER — 技術スタック格ゲー</title>
+  <style>
+    :root {
+      --ui: "Chakra Petch", "Yu Gothic", "Meiryo", "Hiragino Kaku Gothic ProN", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%;
+      background: radial-gradient(circle at 50% 30%, #101a24 0%, #06090d 70%);
+      color: #cdd2dc; font-family: var(--ui);
+      overflow: hidden; overscroll-behavior: none;
+      -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+    }
+    #wrap {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100vh; height: 100dvh; gap: 10px; padding: 6px;
+    }
+    canvas {
+      /* 800x480 (5:3) を維持しつつ画面にフィット */
+      width: min(100vw, calc(100dvh * 5 / 3), 1280px);
+      height: auto; aspect-ratio: 5 / 3; max-height: 100dvh;
+      background: #0b0e14; image-rendering: pixelated;
+      border: 1px solid #26404d; border-radius: 6px;
+      box-shadow: 0 0 60px rgba(0, 90, 140, 0.35), inset 0 0 40px rgba(0,0,0,0.6);
+    }
+    #tips {
+      font-size: 12.5px; color: #8a96a2; text-align: center; line-height: 1.9; max-width: 780px;
+    }
+    kbd {
+      display: inline-block; padding: 1px 7px; margin: 0 1px;
+      font-family: var(--ui); font-weight: 600; font-size: 11px;
+      color: #d6ecf0; background: #20303a; border: 1px solid #32505f;
+      border-radius: 4px; box-shadow: 0 1px 0 #14202a;
+    }
+    #tips .p1 { color: #6ad7e5; font-weight: 600; }
+    #tips .p2 { color: #ff8f7a; font-weight: 600; }
+    /* 操作凡例は対戦中のみ表示 */
+    body:not(.playing) #tips { display: none; }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <canvas id="c" width="800" height="480"></canvas>
+    <div id="tips">
+      <div><span class="p1">1P</span> 移動 <kbd>A</kbd><kbd>D</kbd> ジャンプ <kbd>W</kbd> しゃがみ <kbd>S</kbd> 弱 <kbd>J</kbd> 強 <kbd>K</kbd> 必殺 <kbd>L</kbd>　<span class="p2">2P</span> 移動 <kbd>←</kbd><kbd>→</kbd> ジャンプ <kbd>↑</kbd> しゃがみ <kbd>↓</kbd> 弱 <kbd>1</kbd> 強 <kbd>2</kbd> 必殺 <kbd>3</kbd>(テンキー/BNM)</div>
+      <div>ガード＝相手と反対へ入力（下段はしゃがみ・ジャンプ攻撃は立ち）　ゲージ MAX で 必殺＋強 ＝ 超必殺　　<kbd>`</kbd> でミュート</div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

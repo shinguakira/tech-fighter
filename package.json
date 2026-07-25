@@ -1,0 +1,25 @@
+{
+  "name": "tech-fighter",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Tech-stack fighting game — Gopher (Go) vs Duke (Java). Pure TS logic, tested with Vitest.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsgo --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsgo --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@typescript/native-preview": "^7.0.0-dev.20260707.2",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.6",
+    "vitest": "^3.2.7"
+  },
+  "dependencies": {
+    "@fontsource/chakra-petch": "^5.3.0"
+  }
+}
