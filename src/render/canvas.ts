@@ -659,6 +659,27 @@ function drawSelect(c: Ctx, st: GameState, net: NetInfo | null = null): void {
 /** オンライン対戦時のゲーム内文脈（配線層から渡す）。null=オフライン。 */
 export interface NetInfo { localSide: 0 | 1; roomId: string; stalled: boolean }
 
+// ---- タップ判定（タッチ/クリック用。座標は 800x480 キャンバス系） ----
+/** タイトルのモード行（0..3）。外れは -1。drawTitle のレイアウトと一致させる。 */
+export function hitTitleMode(cx: number, cy: number): number {
+  for (let i = 0; i < 4; i++) {
+    const y = 212 + i * 38;
+    if (cx >= W / 2 - 120 && cx <= W / 2 + 120 && cy >= y - 20 && cy <= y + 12) return i;
+  }
+  return -1;
+}
+/** セレクトのカード（0..n-1）。外れは -1。drawSelect のレイアウトと一致させる。 */
+export function hitSelectCard(cx: number, cy: number): number {
+  const n = CHAR_LIST.length, sideM = 12, gutter = 6, cardY = 96, cardH = 246;
+  const cardW = (W - 2 * sideM - (n - 1) * gutter) / n;
+  if (cy < cardY || cy > cardY + cardH) return -1;
+  for (let i = 0; i < n; i++) {
+    const x0 = sideM + i * (cardW + gutter);
+    if (cx >= x0 && cx <= x0 + cardW) return i;
+  }
+  return -1;
+}
+
 export function render(c: Ctx, st: GameState, net: NetInfo | null = null): void {
   rs.tick++;
   c.clearRect(0, 0, W, H);

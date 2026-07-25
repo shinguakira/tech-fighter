@@ -3,7 +3,7 @@ import '@fontsource/chakra-petch/600.css';
 import '@fontsource/chakra-petch/700.css';
 import '@fontsource/chakra-petch/700-italic.css';
 import { createGame, demoPairs, startDemoMatch, step } from './core/game';
-import { render, resetRenderState } from './render/canvas';
+import { hitSelectCard, hitTitleMode, render, resetRenderState } from './render/canvas';
 import { createControls } from './input/controls';
 import { Sound } from './audio/sound';
 import { OnlineController } from './net/online-ui';
@@ -12,6 +12,11 @@ const canvas = document.getElementById('c') as HTMLCanvasElement | null;
 if (!canvas) throw new Error('canvas #c not found');
 const ctx = canvas.getContext('2d');
 if (!ctx) throw new Error('2d context unavailable');
+
+// タッチ端末ならオンスクリーン操作を表示（PC はキーボード）
+if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+  document.body.classList.add('touch');
+}
 
 let game = createGame();
 const input = createControls();
@@ -27,6 +32,22 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'Backquote') sound.toggleMute();
   // オンラインのロビー/対戦キー（Q/R/F/Esc）は online に委譲
   if (online.isActive()) online.onKey(e.code);
+});
+
+// キャンバスのタップ/クリック（タッチ操作）。メニューを直接叩けるようにする。
+canvas.addEventListener('pointerdown', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const cx = ((e.clientX - rect.left) / rect.width) * 800;
+  const cy = ((e.clientY - rect.top) / rect.height) * 480;
+  if (online.isActive()) { online.tap(cx, cy); return; }
+  // オフライン: タイトルのモード / セレクトのカードをタップで選択
+  if (game.status === 'title') {
+    const m = hitTitleMode(cx, cy);
+    if (m >= 0) { game.modeSel = m; input.pressStart(); }
+  } else if (game.status === 'select') {
+    const card = hitSelectCard(cx, cy);
+    if (card >= 0 && !game.selDone[0]) { game.sel[0] = card; game.selDone[0] = true; }
+  }
 });
 
 function loop(): void {

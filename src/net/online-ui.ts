@@ -40,16 +40,39 @@ export class OnlineController {
   /** ロビー/対戦中のキー入力（main の keydown から）。 */
   onKey(code: string): void {
     if (this.phase === 'lobby' || this.phase === 'error') {
-      if (code === 'KeyQ') this.begin('quick');
-      else if (code === 'KeyR') this.begin('create');
-      else if (code === 'KeyF') {
-        const c = window.prompt('ルームコードを入力:');
-        if (c && c.trim()) this.begin('join', c.trim().toUpperCase());
-      } else if (code === 'Escape') { this.phase = 'closed'; }
+      if (code === 'KeyQ') this.lobbyAction('quick');
+      else if (code === 'KeyR') this.lobbyAction('create');
+      else if (code === 'KeyF') this.lobbyAction('join');
+      else if (code === 'Escape') this.lobbyAction('back');
       return;
     }
     if (this.phase === 'connecting' && code === 'Escape') { this.teardown(); this.phase = 'closed'; return; }
     if (this.phase === 'playing' && code === 'Escape') { this.teardown(); this.phase = 'lobby'; this.status = '対戦を終了しました'; }
+  }
+
+  /** ロビーのタップ（タッチ/クリック。座標は 800x480 系）。処理したら true。 */
+  tap(cx: number, cy: number): boolean {
+    if (this.phase !== 'lobby' && this.phase !== 'error') return false;
+    // 行: y = 180 + i*60、ボックス (W/2-200, y-26, 400, 46)
+    for (let i = 0; i < 3; i++) {
+      const y = 180 + i * 60;
+      if (cx >= W / 2 - 200 && cx <= W / 2 + 200 && cy >= y - 26 && cy <= y + 20) {
+        this.lobbyAction((['quick', 'create', 'join'] as const)[i]!);
+        return true;
+      }
+    }
+    // 下部「Esc でタイトルへ戻る」領域
+    if (cy >= 386 && cy <= 414) { this.lobbyAction('back'); return true; }
+    return true; // ロビー中はキャンバスタップを消費（誤爆で下の画面を触らない）
+  }
+
+  private lobbyAction(which: 'quick' | 'create' | 'join' | 'back'): void {
+    if (which === 'quick') this.begin('quick');
+    else if (which === 'create') this.begin('create');
+    else if (which === 'join') {
+      const c = window.prompt('ルームコードを入力:');
+      if (c && c.trim()) this.begin('join', c.trim().toUpperCase());
+    } else this.phase = 'closed';
   }
 
   private begin(kind: MatchKind, code?: string): void {

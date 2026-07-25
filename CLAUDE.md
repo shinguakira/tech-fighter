@@ -38,7 +38,9 @@ Gopher / Duke / Ferris / Tux / Deno / GNU が戦う 2D 格闘ゲーム。単一 
   `createGame()` と `step(state, input)` は `Math.random`/`Date` を使わない決定論的フレーム更新
   （乱数は `state.rng` の xorshift32）。
 - `src/render/` — 状態 → Canvas 描画のみ（`canvas.ts` + キャラ別 `gopher.ts`/`duke.ts`、ポーズ計算 `pose.ts`）。
-- `src/input/controls.ts` — キーボード → `GameInput`（DOM 入力はここだけ）。1P=WASD+JKL、2P=矢印+テンキー123（or B/N/M）。
+- `src/input/controls.ts` — キーボード＋タッチ → `GameInput`（DOM 入力はここだけ）。1P=WASD+JKL、2P=矢印+テンキー123（or B/N/M）。
+  スマホは `index.html` のオンスクリーン操作（十字＋弱/強/必殺＋START）を 1P 入力にマージ。メニューはキャンバスのタップでも操作可
+  （`main.ts` が `hitTitleMode`/`hitSelectCard` と `online.tap` で処理。オンラインの状態変更はロックステップ経由で desync 回避）。
 - `src/audio/sound.ts` — Web Audio の**手続き合成**（音源ファイル無し）。core は無音のまま、`sound.update(state)` が
   GameState の差分（被弾/ガード/技発生/飛び道具/ジャンプ/ゲージMAX/KO/画面遷移）を観測して SFX を鳴らし、
   BGM（ベース＋リードの16ステップループ）の音量を状況で調整。Backquote(`) でミュート。

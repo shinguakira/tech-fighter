@@ -13,19 +13,19 @@
       margin: 0; height: 100%;
       background: radial-gradient(circle at 50% 30%, #101a24 0%, #06090d 70%);
       color: #cdd2dc; font-family: var(--ui);
-      overflow: hidden; overscroll-behavior: none;
+      overflow: hidden; overscroll-behavior: none; touch-action: none;
       -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
     }
     #wrap {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      height: 100vh; height: 100dvh; gap: 10px; padding: 6px;
+      height: 100vh; height: 100dvh; gap: 10px; padding: 6px; padding-bottom: env(safe-area-inset-bottom);
     }
     canvas {
       /* 800x480 (5:3) を維持しつつ画面にフィット */
       width: min(100vw, calc(100dvh * 5 / 3), 1280px);
       height: auto; aspect-ratio: 5 / 3; max-height: 100dvh;
       background: #0b0e14; image-rendering: pixelated;
-      border: 1px solid #26404d; border-radius: 6px;
+      border: 1px solid #26404d; border-radius: 6px; touch-action: none;
       box-shadow: 0 0 60px rgba(0, 90, 140, 0.35), inset 0 0 40px rgba(0,0,0,0.6);
     }
     #tips {
@@ -41,6 +41,57 @@
     #tips .p2 { color: #ff8f7a; font-weight: 600; }
     /* 操作凡例は対戦中のみ表示 */
     body:not(.playing) #tips { display: none; }
+
+    /* ---- タッチ操作（スマホ） ---- */
+    #touch { display: none; }
+    .b {
+      -webkit-user-select: none; user-select: none; touch-action: none;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--ui); font-weight: 700; color: #eef2f7;
+      background: rgba(30,44,60,0.62); border: 1px solid rgba(90,150,180,0.45);
+      border-radius: 999px; backdrop-filter: blur(2px);
+    }
+    .b.on { background: rgba(90,220,180,0.5); border-color: #7ef0c8; }
+    #touch .pad {
+      position: fixed; left: calc(10px + env(safe-area-inset-left)); bottom: calc(12px + env(safe-area-inset-bottom));
+      display: grid; grid-template-columns: repeat(3, 15vmin); grid-template-rows: repeat(3, 15vmin); gap: 3px;
+    }
+    .pad .b { font-size: 6vmin; }
+    .pad .up { grid-area: 1 / 2; } .pad .left { grid-area: 2 / 1; }
+    .pad .right { grid-area: 2 / 3; } .pad .down { grid-area: 3 / 2; }
+    #touch .actions {
+      position: fixed; right: calc(10px + env(safe-area-inset-right)); bottom: calc(12px + env(safe-area-inset-bottom));
+      display: grid; grid-template-columns: repeat(2, 16vmin); grid-template-rows: repeat(2, 16vmin); gap: 8px;
+      justify-items: center; align-items: center;
+    }
+    .actions .b { width: 16vmin; height: 16vmin; font-size: 4.4vmin; }
+    .actions .light { grid-column: 1; grid-row: 2; background: rgba(255,95,143,0.28); border-color: #ff7aa3; }
+    .actions .heavy { grid-column: 2; grid-row: 1; background: rgba(255,180,80,0.26); border-color: #ffb84a; color: #ffe6bf; }
+    .actions .special { grid-column: 2; grid-row: 2; background: rgba(150,120,240,0.28); border-color: #a58aff; color: #e6ddff; }
+    #touch .startbtn {
+      position: fixed; top: calc(8px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+      padding: 6px 20px; border-radius: 999px; font-size: 3.4vmin; z-index: 21;
+    }
+
+    /* タッチ端末ではタッチUIを表示、キーボードのヒントは隠す */
+    body.touch #tips { display: none; }
+    body.touch #touch { display: block; }
+    @media (pointer: coarse) {
+      #tips { display: none; }
+      #touch { display: block; }
+    }
+
+    /* 横向き推奨ヒント（タッチ端末＋縦向きのみ） */
+    #rotate { display: none; }
+    @media (orientation: portrait) {
+      body.touch #rotate, .coarse #rotate {
+        display: flex; align-items: center; gap: 6px;
+        position: fixed; top: calc(8px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+        z-index: 30; padding: 7px 15px; border-radius: 999px;
+        background: rgba(60,180,150,0.92); color: #06120e; font-size: 13px; font-weight: 700;
+        box-shadow: 0 2px 14px rgba(0,0,0,0.55); white-space: nowrap;
+      }
+    }
   </style>
 </head>
 <body>
@@ -51,6 +102,25 @@
       <div>ガード＝相手と反対へ入力（下段はしゃがみ・ジャンプ攻撃は立ち）　ゲージ MAX で 必殺＋強 ＝ 超必殺　　<kbd>`</kbd> でミュート</div>
     </div>
   </div>
+
+  <div id="rotate">↻ 横向きでのプレイを推奨</div>
+
+  <!-- スマホ用オンスクリーン操作 -->
+  <div id="touch">
+    <div class="pad">
+      <div class="b up" data-hold="up">▲</div>
+      <div class="b left" data-hold="left">◀</div>
+      <div class="b right" data-hold="right">▶</div>
+      <div class="b down" data-hold="down">▼</div>
+    </div>
+    <div class="actions">
+      <div class="b heavy" data-hold="heavy">強</div>
+      <div class="b light" data-hold="light">弱</div>
+      <div class="b special" data-hold="special">必殺</div>
+    </div>
+    <div class="b startbtn" data-press="start">START / 決定</div>
+  </div>
+
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
