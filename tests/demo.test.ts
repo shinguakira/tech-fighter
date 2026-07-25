@@ -45,7 +45,7 @@ describe('観戦モード (CPU vs CPU)', () => {
   });
 
   it('demoPairs は全キャラの総当たり（15カード）', () => {
-    expect(demoPairs().length).toBe(15);
+    expect(demoPairs().length).toBe(21); // 7C2
   });
 
   it('両側 AI が実際に行動し、試合が成立する', () => {

@@ -3,6 +3,7 @@ import { CHARS, CHAR_LIST, FLOOR_Y, H, METER_MAX, ROUND_END_FRAMES, SUPER_COST, 
 import { hasCustomAI } from '../core/ai';
 import { timerSec } from '../core/game';
 import type { CharId, Effect, Fighter, GameState, Projectile } from '../core/types';
+import { drawBun } from './bun';
 import { drawDeno } from './deno';
 import { drawDuke } from './duke';
 import { drawFerris } from './ferris';
@@ -20,6 +21,7 @@ const DRAW: Record<CharId, (c: Ctx2, f: Fighter, a: FighterAnim) => void> = {
   tux: drawTux,
   deno: drawDeno,
   gnu: drawGnu,
+  bun: drawBun,
 };
 
 type Ctx = CanvasRenderingContext2D;
@@ -200,6 +202,19 @@ function drawProjectile(c: Ctx, p: Projectile, tick: number): void {
     c.textAlign = 'center';
     c.fillStyle = '#e8f4ff';
     c.fillText('TS', cx, cy + 4);
+    c.restore();
+  } else if (p.kind === 'pkg') {
+    // bun install: 回転する荷物（茶色の箱＋ヒモ）
+    c.save();
+    c.translate(cx, cy);
+    c.rotate(tick * 0.1 * dir);
+    c.fillStyle = '#d8a45c';
+    c.fillRect(-10, -9, 20, 18);
+    c.strokeStyle = '#8a5a2e'; c.lineWidth = 2;
+    c.strokeRect(-10, -9, 20, 18);
+    // 十字のヒモ
+    c.beginPath(); c.moveTo(0, -9); c.lineTo(0, 9); c.moveTo(-10, 0); c.lineTo(10, 0);
+    c.lineWidth = 1.6; c.strokeStyle = '#f2d8a0'; c.stroke();
     c.restore();
   } else if (p.kind === 'boomerang') {
     // Recursive GNU: 回転するブーメラン（"GNU" の弧）
@@ -509,8 +524,8 @@ function drawCredit(c: Ctx): void {
   c.textAlign = 'center';
   c.font = `500 9.5px ${FONT}`;
   c.fillStyle = '#5a6a7a';
-  c.fillText('Go gopher by Renée French (CC BY 4.0)　·　Duke © Sun Microsystems (New BSD)　·　Ferris by Karen Rustad Tölva (CC0)', W / 2, H - 25);
-  c.fillText('Tux by Larry Ewing (lewing@isc.tamu.edu) and The GIMP　·　Deno dino by ry (MIT)　·　GNU head by Aurélio Heckert (Free Art / GFDL)', W / 2, H - 13);
+  c.fillText('Go gopher by Renée French (CC BY 4.0)　·　Duke © Sun Microsystems (New BSD)　·　Ferris by Karen Rustad Tölva (CC0)　·　Tux by Larry Ewing and The GIMP', W / 2, H - 25);
+  c.fillText('Deno dino by ry (MIT)　·　GNU head by Aurélio Heckert (Free Art / GFDL)　·　Bun © Oven / Anthropic (MIT, press-kit)', W / 2, H - 13);
   c.restore();
 }
 
@@ -525,13 +540,13 @@ function drawTitle(c: Ctx, st: GameState): void {
   c.font = `italic 700 58px ${FONT}`;
   c.fillText('TECH FIGHTER', W / 2, 130);
   c.shadowBlur = 0;
-  c.font = `600 14px ${FONT}`;
+  c.font = `600 13px ${FONT}`;
   c.fillStyle = '#8a9aaa';
-  c.fillText('GOPHER · DUKE · FERRIS · TUX · DENO · GNU', W / 2, 160);
+  c.fillText('GOPHER · DUKE · FERRIS · TUX · DENO · GNU · BUN', W / 2, 160);
   c.restore();
 
-  // 6キャラの見本（中央メニューを避けて左右に3体ずつ・中央へ向く）
-  const left: [CharId, number][] = [['ferris', 22], ['gopher', 92], ['deno', 158]];
+  // 7キャラの見本（中央メニューを避けて左右に振り分け）
+  const left: [CharId, number][] = [['ferris', 20], ['gopher', 86], ['deno', 150], ['bun', 214]];
   const right: [CharId, number][] = [['duke', 588], ['tux', 654], ['gnu', 720]];
   for (const [ch, x] of left) DRAW[ch](c, dummyFighter(ch, x, 1), titleAnims[CHAR_LIST.indexOf(ch)]!);
   for (const [ch, x] of right) DRAW[ch](c, dummyFighter(ch, x, -1), titleAnims[CHAR_LIST.indexOf(ch)]!);
@@ -581,8 +596,9 @@ function drawSelect(c: Ctx, st: GameState, net: NetInfo | null = null): void {
     duke: 'Java 重い一撃',
     ferris: 'Rust 掴み装甲',
     tux: 'Linux 下段弾幕',
-    deno: 'Deno 万能突進',
+    deno: 'Deno 首長噛み',
     gnu: 'GNU 曲射搦め手',
+    bun: 'Bun 俊敏連射',
   };
   const n = CHAR_LIST.length;
   const sideM = 12, gutter = 6, cardY = 96, cardH = 246;
@@ -734,10 +750,11 @@ export function render(c: Ctx, st: GameState, net: NetInfo | null = null): void 
   if (st.mode === 'demo') {
     c.save();
     c.textAlign = 'center';
-    const pairs = st.demoPair % 15 + 1;
+    const nPairs = CHAR_LIST.length * (CHAR_LIST.length - 1) / 2;
+    const pairs = st.demoPair % nPairs + 1;
     c.font = `700 12px ${FONT}`;
     c.fillStyle = rs.tick % 60 < 40 ? '#ffd24a' : '#c98a3a';
-    c.fillText(`● 観戦 CPU vs CPU  —  ${CHARS[st.fighters[0].char].name} vs ${CHARS[st.fighters[1].char].name}  (${pairs}/15)`, W / 2, 96);
+    c.fillText(`● 観戦 CPU vs CPU  —  ${CHARS[st.fighters[0].char].name} vs ${CHARS[st.fighters[1].char].name}  (${pairs}/${nPairs})`, W / 2, 96);
     c.font = `500 10px ${FONT}`;
     c.fillStyle = '#7a90a6';
     c.fillText('ENTER で終了', W / 2, 112);

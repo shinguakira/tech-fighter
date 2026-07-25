@@ -1,6 +1,6 @@
 // ゲームの純粋な型定義（DOM 非依存）
 
-export type CharId = 'gopher' | 'duke' | 'ferris' | 'tux' | 'deno' | 'gnu';
+export type CharId = 'gopher' | 'duke' | 'ferris' | 'tux' | 'deno' | 'gnu' | 'bun';
 export type Facing = 1 | -1;
 export type Side = 0 | 1;
 
@@ -74,7 +74,7 @@ export interface CharDef {
 
 export type ProjKind =
   | 'gofunc' | 'null' | 'swarm' | 'oom' | 'crate' | 'pipe' | 'beam'
-  | 'fetch' | 'rain' | 'boomerang' | 'gpl';
+  | 'fetch' | 'rain' | 'boomerang' | 'gpl' | 'pkg';
 
 export interface Projectile extends Rect {
   owner: Side;

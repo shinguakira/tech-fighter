@@ -10,11 +10,15 @@ Gopher / Duke / Ferris / Tux / Deno / GNU が戦う 2D 格闘ゲーム。単一 
 - **Ferris**（Rust）— Karen Rustad Tölva 作 / CC0 パブリックドメイン（rustacean.net）。
 - **Tux**（Linux）— Larry Ewing 作。クレジット表記（lewing@isc.tamu.edu and The GIMP）で使用・改変自由。
 - **Deno**（Deno）— 元祖マスコット（ry 作）が MIT License（deno.com/artwork）。
+  実物は**丸胴＋長首＋小頭のブロントサウルス（首長竜）型・モノクロ（黒白）＋雨**が象徴（緑ではない）。
 - **GNU**（GNU）— A GNU head（Aurélio A. Heckert 作）/ Free Art License・GFDL・CC BY-SA（gnu.org）。
-- 全キャラ画像素材ではなく **Canvas 手続き描画**（`src/render/<char>.ts`）。
+  実物は**正面顔の黒白ライン画・大きく湾曲した角・長いあごひげ・もじゃたてがみ**（グレー系）。
+- **Bun**（Bun）— コードは MIT、ロゴ/マスコットは press-kit(bun.sh/press-kit) 提供・明示的制限ポリシー無し。
+  実物は**クリーム色の丸パン＋点目＋ピンクのほっぺ＋笑み**。原案スタイルの手続き描画＋クレジットで使用。
+- 全キャラ画像素材ではなく **Canvas 手続き描画**（`src/render/<char>.ts`）。**必ず実物を見て**造形する。
 - 各言語の**ロゴやワードマークは商標なので描かない**（マスコットのみ使用）。
-- ライセンス未整備のため見送ったマスコット: **Elysia chan**（ライセンス明記なし＋特定作家の著作キャラ）、
-  **Bun**（コードは MIT だがマスコット未整備）、**PHP elePHPant**、**FreeBSD Beastie**（用途限定）。
+- ライセンス未整備で見送ったマスコット: **Elysia chan**（ライセンス明記なし＋特定作家の著作キャラ）、
+  **PHP elePHPant**、**FreeBSD Beastie**（用途限定）。
 
 ## ゲームデザイン
 

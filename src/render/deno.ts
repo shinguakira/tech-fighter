@@ -1,33 +1,31 @@
-// Deno（Deno ランタイムの恐竜）の格闘描画。
+// Deno（Deno ランタイムの恐竜 "DeeDee"）の格闘描画。
 // Deno's dinosaur mascot — original artwork by ry, MIT License (deno.com/artwork)。
-// 丸っこい緑の恐竜。大きな頭・小さな前脚・太い後脚・しっぽが特徴。
+// 公式は「丸い胴＋長い首＋小さな頭」のブロントサウルス（首長竜）型・モノクロ（黒白）＋雨が象徴。
+// 攻撃は長い首を突き出して噛む動きに割り当てる。
 import { CHARS } from '../core/constants';
 import type { Fighter } from '../core/types';
 import { computePose, type FighterAnim } from './pose';
 
 type Ctx = CanvasRenderingContext2D;
 
-const BODY = '#5aa544';       // Deno グリーン
-const BODY_ALT = '#c98a3a';   // 2P カラー（サンドベージュ）
-const BELLY = '#bfe6a2';
-const BELLY_ALT = '#f0d29a';
-const OUTLINE = '#173a12';
-const OUTLINE_ALT = '#4a2f10';
-const INK = '#0e1a0a';
+const BODY = '#3a434e';       // ダークスレート（モノクロ寄り）
+const BODY_ALT = '#3f5c86';   // 2P カラー（スレートブルー）
+const BELLY = '#c6d0da';
+const BELLY_ALT = '#cfe0f2';
+const OUTLINE = '#0d1219';
+const OUTLINE_ALT = '#0e1a2c';
+const INK = '#0a0d12';
 
-/** ネイティブ描画高（足元 0 → 頭頂 -56）。 */
-const NATIVE_H = 56;
+/** ネイティブ描画高（足元 0 → 頭 -60 付近）。 */
+const NATIVE_H = 66;
 
-function limb(ctx: Ctx, body: string, outline: string, sx: number, sy: number, ex: number, ey: number, wide: number): void {
+function leg(ctx: Ctx, body: string, outline: string, x: number, y: number, w: number): void {
   ctx.beginPath();
-  ctx.moveTo(sx, sy);
-  ctx.lineTo(ex, ey);
-  ctx.lineWidth = wide + 2.5;
+  ctx.ellipse(x, y, w, 3.4, 0, 0, Math.PI * 2);
+  ctx.fillStyle = body;
+  ctx.fill();
+  ctx.lineWidth = 2;
   ctx.strokeStyle = outline;
-  ctx.lineCap = 'round';
-  ctx.stroke();
-  ctx.lineWidth = wide;
-  ctx.strokeStyle = body;
   ctx.stroke();
 }
 
@@ -46,172 +44,130 @@ export function drawDeno(ctx: Ctx, f: Fighter, anim: FighterAnim): void {
   ctx.translate(cx, feetY);
   ctx.scale(f.facing, 1);
 
-  // ダウン: 仰向け（脚を上に）
+  // ダウン: 横倒れ（脚を上に）
   if (pose.lying) {
     ctx.scale(k, k);
     ctx.beginPath();
-    ctx.ellipse(-2, -10, 24, 10, 0, 0, Math.PI * 2);
-    ctx.fillStyle = body;
-    ctx.fill();
-    ctx.lineWidth = 2.4;
-    ctx.strokeStyle = outline;
-    ctx.stroke();
-    // 上を向いた頭＋バツ目
+    ctx.ellipse(0, -10, 25, 10, 0, 0, Math.PI * 2);
+    ctx.fillStyle = body; ctx.fill();
+    ctx.lineWidth = 2.4; ctx.strokeStyle = outline; ctx.stroke();
+    // 上に伸びる首＋バツ目の頭
     ctx.beginPath();
-    ctx.arc(16, -14, 9, 0, Math.PI * 2);
-    ctx.fillStyle = body;
-    ctx.fill();
-    ctx.stroke();
-    ctx.strokeStyle = INK;
-    ctx.lineWidth = 1.6;
-    for (const [ex0, ey0] of [[14, -16], [19, -15]] as const) {
-      ctx.beginPath();
-      ctx.moveTo(ex0 - 1.6, ey0 - 1.6); ctx.lineTo(ex0 + 1.6, ey0 + 1.6);
-      ctx.moveTo(ex0 + 1.6, ey0 - 1.6); ctx.lineTo(ex0 - 1.6, ey0 + 1.6);
-      ctx.stroke();
+    ctx.moveTo(16, -12); ctx.quadraticCurveTo(26, -22, 24, -30);
+    ctx.lineWidth = 6; ctx.strokeStyle = body; ctx.stroke();
+    ctx.beginPath(); ctx.arc(24, -32, 6, 0, Math.PI * 2); ctx.fillStyle = body; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = outline; ctx.stroke();
+    ctx.strokeStyle = INK; ctx.lineWidth = 1.5;
+    for (const [ex, ey] of [[22, -33], [26, -32]] as const) {
+      ctx.beginPath(); ctx.moveTo(ex - 1.4, ey - 1.4); ctx.lineTo(ex + 1.4, ey + 1.4);
+      ctx.moveTo(ex + 1.4, ey - 1.4); ctx.lineTo(ex - 1.4, ey + 1.4); ctx.stroke();
     }
     ctx.restore();
     return;
   }
 
   if (pose.tumble !== 0) {
-    ctx.translate(0, -f.h / 2);
-    ctx.rotate(pose.tumble);
-    ctx.translate(0, f.h / 2);
+    ctx.translate(0, -f.h / 2); ctx.rotate(pose.tumble); ctx.translate(0, f.h / 2);
   }
 
   const crouchSy = pose.crouch ? def.crouchH / def.h : 1;
-  const crouchSx = pose.crouch ? 1.12 : 1;
+  const crouchSx = pose.crouch ? 1.14 : 1;
   ctx.scale(k * pose.sx * crouchSx, k * pose.sy * crouchSy);
   ctx.rotate(pose.lean);
 
-  // しっぽ（体の後方・地面近く）
-  ctx.beginPath();
-  ctx.moveTo(-14, -12);
-  ctx.quadraticCurveTo(-30, -10, -34, -2);
-  ctx.quadraticCurveTo(-26, -6, -14, -6);
-  ctx.closePath();
-  ctx.fillStyle = body;
-  ctx.fill();
-  ctx.lineWidth = 2.4;
-  ctx.strokeStyle = outline;
-  ctx.stroke();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
 
-  // 後脚（太い2本）
-  for (const [lx, st] of [[-7, pose.strideB], [7, pose.strideF]] as const) {
-    limb(ctx, body, outline, lx, -18, lx + st * 0.6, -2 - (st > 0 ? pose.lift : 0), 7);
-    // 足
-    ctx.beginPath();
-    ctx.ellipse(lx + st * 0.6 + 3, -2 - (st > 0 ? pose.lift : 0), 6, 3, 0, 0, Math.PI * 2);
-    ctx.fillStyle = body;
-    ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = outline;
-    ctx.stroke();
-  }
+  // しっぽ（後方へ伸びて上へ反る）
+  ctx.beginPath();
+  ctx.moveTo(-16, -16);
+  ctx.quadraticCurveTo(-34, -14, -40, -22);
+  ctx.quadraticCurveTo(-30, -10, -14, -8);
+  ctx.closePath();
+  ctx.fillStyle = body; ctx.fill();
+  ctx.lineWidth = 2.4; ctx.strokeStyle = outline; ctx.stroke();
+
+  // 4本の短い脚（奥2本は暗め・手前2本は歩行ストライド）
+  leg(ctx, outline, outline, -8, -3, 5.5);
+  leg(ctx, outline, outline, 8, -3, 5.5);
+  leg(ctx, body, outline, -8 + pose.strideB, -3 - (pose.strideB > 0 ? pose.lift : 0), 6);
+  leg(ctx, body, outline, 8 + pose.strideF, -3 - (pose.strideF > 0 ? pose.lift : 0), 6);
 
   ctx.save();
   ctx.translate(0, pose.bob);
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
 
-  // 後ろの小さな前脚
-  if (pose.bothArms || pose.guard) {
-    const r2 = pose.armRot + 0.5;
-    limb(ctx, body, outline, -8, -30, -8 + Math.cos(r2) * 16, -30 + Math.sin(r2) * 16, 4);
-  } else {
-    limb(ctx, body, outline, -8, -30, -13, -24, 4);
-  }
+  // 胴（丸くずんぐり）
+  ctx.beginPath();
+  ctx.ellipse(-1, -22, 21, 16, 0, 0, Math.PI * 2);
+  ctx.fillStyle = body; ctx.fill();
+  ctx.lineWidth = 2.6; ctx.strokeStyle = outline; ctx.stroke();
+  // 腹（明色）
+  ctx.beginPath();
+  ctx.ellipse(1, -16, 15, 9, 0, 0, Math.PI * 2);
+  ctx.fillStyle = belly; ctx.globalAlpha = 0.85; ctx.fill(); ctx.globalAlpha = 1;
 
-  // 体（ずんぐり卵型）
+  // ---- 首＋頭（＝攻撃の「腕」。首を突き出して噛む） ----
+  const baseX = 13, baseY = -30;
+  // idle は首を上へ、攻撃(armExt/armRot)で前へ突き出す
+  const angle = -1.15 + (pose.armRot - 0.45) * 0.72;
+  const reach = 24 + pose.armExt;
+  const hx = baseX + Math.cos(angle) * reach;
+  const hy = baseY + Math.sin(angle) * reach;
+  // 首（太→細へテーパー。二次曲線で弧）
+  const midX = baseX + Math.cos(angle) * reach * 0.5 + 3;
+  const midY = baseY + Math.sin(angle) * reach * 0.5;
   ctx.beginPath();
-  ctx.ellipse(0, -26, 16, 22, 0, 0, Math.PI * 2);
-  ctx.fillStyle = body;
-  ctx.fill();
-  ctx.lineWidth = 2.6;
-  ctx.strokeStyle = outline;
-  ctx.stroke();
-  // 腹
-  ctx.beginPath();
-  ctx.ellipse(3, -20, 9, 14, 0.05, 0, Math.PI * 2);
-  ctx.fillStyle = belly;
-  ctx.fill();
+  ctx.moveTo(baseX - 7, baseY + 2);
+  ctx.quadraticCurveTo(midX - 5, midY, hx - 5, hy + 1);
+  ctx.lineTo(hx + 4, hy - 2);
+  ctx.quadraticCurveTo(midX + 6, midY - 2, baseX + 7, baseY - 2);
+  ctx.closePath();
+  ctx.fillStyle = body; ctx.fill();
+  ctx.lineWidth = 2.4; ctx.strokeStyle = outline; ctx.stroke();
 
-  // 頭（大きめ・前方に突き出す）
+  // 頭（小さく丸い・短い口吻）
+  ctx.save();
+  ctx.translate(hx, hy);
+  ctx.rotate(angle + Math.PI / 2);
   ctx.beginPath();
-  ctx.ellipse(4, -46, 15, 13, 0, 0, Math.PI * 2);
-  ctx.fillStyle = body;
-  ctx.fill();
-  ctx.lineWidth = 2.6;
-  ctx.strokeStyle = outline;
-  ctx.stroke();
-  // 鼻先（マズル）
+  ctx.ellipse(0, 0, 8, 7, 0, 0, Math.PI * 2);
+  ctx.fillStyle = body; ctx.fill();
+  ctx.lineWidth = 2.2; ctx.strokeStyle = outline; ctx.stroke();
+  // 口吻（前方へ）
   ctx.beginPath();
-  ctx.ellipse(15, -44, 7, 6, 0, 0, Math.PI * 2);
-  ctx.fillStyle = body;
-  ctx.fill();
-  ctx.stroke();
-  // 背びれ（頭上の小さなトゲ2枚）
-  ctx.beginPath();
-  ctx.moveTo(-6, -56); ctx.lineTo(-2, -63); ctx.lineTo(2, -56);
-  ctx.moveTo(2, -57); ctx.lineTo(6, -62); ctx.lineTo(9, -56);
-  ctx.fillStyle = body;
-  ctx.fill();
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = outline;
-  ctx.stroke();
-
+  ctx.ellipse(6, 1, 4.5, 3.4, 0, 0, Math.PI * 2);
+  ctx.fillStyle = body; ctx.fill(); ctx.stroke();
   // 鼻の穴
   ctx.fillStyle = INK;
-  ctx.beginPath();
-  ctx.arc(19, -45, 1.2, 0, Math.PI * 2);
-  ctx.fill();
-
+  ctx.beginPath(); ctx.arc(9, 0.5, 0.9, 0, Math.PI * 2); ctx.fill();
   // 目（被弾で ><）
   if (pose.hurt) {
-    ctx.strokeStyle = INK;
-    ctx.lineWidth = 1.8;
-    ctx.beginPath();
-    ctx.moveTo(4, -50); ctx.lineTo(9, -46);
-    ctx.moveTo(9, -50); ctx.lineTo(4, -46);
-    ctx.stroke();
+    ctx.strokeStyle = INK; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(-2, -3); ctx.lineTo(2, 1); ctx.moveTo(2, -3); ctx.lineTo(-2, 1); ctx.stroke();
   } else {
-    ctx.beginPath();
-    ctx.arc(7, -48, 4.4, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff';
-    ctx.fill();
-    ctx.lineWidth = 1.6;
-    ctx.strokeStyle = outline;
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(8.4, -48, 2, 0, Math.PI * 2);
-    ctx.fillStyle = INK;
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(0, -1.5, 3, 0, Math.PI * 2); ctx.fillStyle = '#ffffff'; ctx.fill();
+    ctx.lineWidth = 1.4; ctx.strokeStyle = outline; ctx.stroke();
+    ctx.beginPath(); ctx.arc(1, -1.5, 1.5, 0, Math.PI * 2); ctx.fillStyle = INK; ctx.fill();
   }
+  ctx.restore();
 
-  // 前脚（肩 8,-30 から回転・突き出し）
-  const sh = { x: 8, y: -30 };
-  const reach = 10 + pose.armExt;
-  const hx = sh.x + Math.cos(pose.armRot) * reach;
-  const hy = sh.y + Math.sin(pose.armRot) * reach;
-  limb(ctx, body, outline, sh.x, sh.y, hx, hy, 4.4);
-  // 爪
-  ctx.beginPath();
-  ctx.arc(hx, hy, 3, 0, Math.PI * 2);
-  ctx.fillStyle = flash ? '#ffffff' : belly;
-  ctx.fill();
-  ctx.lineWidth = 1.4;
-  ctx.strokeStyle = outline;
-  ctx.stroke();
-
+  // 噛み付き active のスピード線
   if (pose.armExt > 10) {
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.strokeStyle = 'rgba(200,220,240,0.5)';
     ctx.lineWidth = 1.4;
     for (const dy of [-4, 0, 4]) {
-      ctx.beginPath();
-      ctx.moveTo(hx - 14, hy + dy);
-      ctx.lineTo(hx - 4, hy + dy);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(hx - Math.cos(angle) * 16, hy - Math.sin(angle) * 16 + dy);
+      ctx.lineTo(hx - Math.cos(angle) * 6, hy - Math.sin(angle) * 6 + dy); ctx.stroke();
+    }
+  }
+  // 待機中の雨のしずく（Deno の象徴）
+  if (f.atk <= 0 && f.grounded) {
+    ctx.strokeStyle = 'rgba(150,190,230,0.35)';
+    ctx.lineWidth = 1.2;
+    for (let i = 0; i < 3; i++) {
+      const rx = -18 + ((anim.tick * 0.6 + i * 40) % 60) * 0.6 + i * 12;
+      const ry = -58 + ((anim.tick * 1.3 + i * 20) % 40);
+      ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx - 1.5, ry + 5); ctx.stroke();
     }
   }
 

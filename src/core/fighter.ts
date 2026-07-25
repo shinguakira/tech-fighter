@@ -132,12 +132,19 @@ function spawnProjectiles(st: GameState, f: Fighter): void {
         x: dir > 0 ? f.x + f.w : f.x - 30, y: feet - 60, w: 30, h: 18,
         vx: 6.6 * dir, life: 190, id: pid(),
       });
-    } else {
+    } else if (f.char === 'gnu') {
       // Recursive GNU: 往復するブーメラン弾（ax で戻ってくる）
       st.projectiles.push({
         ...base, ...P0, kind: 'boomerang',
         x: dir > 0 ? f.x + f.w : f.x - 24, y: feet - 58, w: 24, h: 24,
         vx: 7.2 * dir, life: 150, ax: -0.28 * dir, id: pid(),
+      });
+    } else {
+      // bun install: 速い荷物（パッケージ箱）弾
+      st.projectiles.push({
+        ...base, ...P0, kind: 'pkg',
+        x: dir > 0 ? f.x + f.w : f.x - 24, y: feet - 58, w: 24, h: 22,
+        vx: 6.4 * dir, life: 190, id: pid(),
       });
     }
   } else if (f.move === 'super') {
@@ -187,6 +194,17 @@ function spawnProjectiles(st: GameState, f: Fighter): void {
         vx: 4.4 * dir, life: 200, id: pid(),
       });
       st.shake = Math.max(st.shake, 12);
+    } else if (f.char === 'bun') {
+      // ALL-IN-ONE: 荷物(pkg)の時間差5連射
+      const spread = [-6, -2, 2, 6, 0];
+      for (let i = 0; i < 5; i++) {
+        st.projectiles.push({
+          ...base, ...P0, kind: 'pkg',
+          x: dir > 0 ? f.x + f.w : f.x - 22, y: feet - 60 + spread[i]!, w: 22, h: 20,
+          vx: 8 * dir, life: 150, delay: i * 6, id: pid(i),
+        });
+      }
+      st.shake = Math.max(st.shake, 8);
     }
     // ferris の super（unsafe { }）は近接掴みなので弾は出ない
   }

@@ -220,8 +220,36 @@ const GNU: CharDef = {
   },
 };
 
-export const CHARS: Record<CharId, CharDef> = { gopher: GOPHER, duke: DUKE, ferris: FERRIS, tux: TUX, deno: DENO, gnu: GNU };
-export const CHAR_LIST: readonly CharId[] = ['gopher', 'duke', 'ferris', 'tux', 'deno', 'gnu'];
+/**
+ * BUN（Bun ランタイム）— 俊敏なオールインワン・ラッシュ。速い足回りと素早い技で押す。
+ * bun install（速い荷物弾）・Hot Reload（突進）・bun --watch（対空）・ALL-IN-ONE（連射超必）。
+ */
+const BUN: CharDef = {
+  id: 'bun',
+  name: 'BUN',
+  hp: 98,
+  walkF: 2.8,
+  walkB: 2.2,
+  jumpVy: -11.4,
+  jumpVx: 2.7,
+  w: 48,
+  h: 78,
+  crouchH: 54,
+  moves: {
+    light: move({ id: 'light', name: 'Bun Jab', dmg: 5, startup: 4, active: 3, recovery: 8, hitstun: 15, blockstun: 9, kbx: 3.2, kby: 0, level: 'mid', knockdown: false, range: 42, hitY: -58, hitH: 24, hitstop: 5, meterGain: 6 }),
+    clight: move({ id: 'clight', name: 'Low Nibble', dmg: 4, startup: 4, active: 3, recovery: 9, hitstun: 14, blockstun: 8, kbx: 2.8, kby: 0, level: 'low', knockdown: false, range: 44, hitY: -18, hitH: 16, hitstop: 5, meterGain: 5 }),
+    heavy: move({ id: 'heavy', name: 'Rolling Pin', dmg: 11, startup: 10, active: 4, recovery: 17, hitstun: 22, blockstun: 13, kbx: 6.4, kby: -2.2, level: 'mid', knockdown: false, range: 52, hitY: -70, hitH: 44, hitstop: 9, meterGain: 10 }),
+    cheavy: move({ id: 'cheavy', name: 'Dough Sweep', dmg: 9, startup: 8, active: 4, recovery: 18, hitstun: 24, blockstun: 12, kbx: 4, kby: 0, level: 'low', knockdown: true, range: 54, hitY: -16, hitH: 16, hitstop: 8, meterGain: 8 }),
+    air: move({ id: 'air', name: 'Bun Drop', dmg: 8, startup: 5, active: 9, recovery: 10, hitstun: 19, blockstun: 12, kbx: 4, kby: 0, level: 'high', knockdown: false, range: 42, hitY: -28, hitH: 34, hitstop: 7, meterGain: 7 }),
+    spN: move({ id: 'spN', name: 'bun install', dmg: 8, chip: 2, startup: 10, active: 2, recovery: 20, hitstun: 18, blockstun: 13, kbx: 5, kby: 0, level: 'mid', knockdown: false, range: 0, hitY: 0, hitH: 0, hitstop: 6, meterGain: 8, projectile: true }),
+    spF: move({ id: 'spF', name: 'Hot Reload', dmg: 10, chip: 3, startup: 8, active: 10, recovery: 16, hitstun: 20, blockstun: 14, kbx: 7, kby: -3, level: 'mid', knockdown: false, range: 46, hitY: -64, hitH: 44, hitstop: 8, meterGain: 9, lunge: 6.5 }),
+    spU: move({ id: 'spU', name: 'bun --watch', dmg: 11, chip: 3, startup: 5, active: 8, recovery: 24, hitstun: 26, blockstun: 14, kbx: 3, kby: -9.5, level: 'mid', knockdown: true, range: 42, hitY: -104, hitH: 92, hitstop: 9, meterGain: 9, invul: 9 }),
+    super: move({ id: 'super', name: 'ALL-IN-ONE', dmg: 5, chip: 1, startup: 12, active: 2, recovery: 30, hitstun: 16, blockstun: 12, kbx: 3, kby: 0, level: 'mid', knockdown: false, range: 0, hitY: 0, hitH: 0, hitstop: 5, meterGain: 0, projectile: true }),
+  },
+};
+
+export const CHARS: Record<CharId, CharDef> = { gopher: GOPHER, duke: DUKE, ferris: FERRIS, tux: TUX, deno: DENO, gnu: GNU, bun: BUN };
+export const CHAR_LIST: readonly CharId[] = ['gopher', 'duke', 'ferris', 'tux', 'deno', 'gnu', 'bun'];
 
 export const charAt = (i: number): CharId => CHAR_LIST[((i % CHAR_LIST.length) + CHAR_LIST.length) % CHAR_LIST.length]!;
 

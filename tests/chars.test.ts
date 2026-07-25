@@ -8,7 +8,7 @@ const ALL_MOVES: MoveId[] = ['light', 'heavy', 'clight', 'cheavy', 'air', 'spN',
 
 describe('characters', () => {
   it('全キャラ: フレームデータが健全（発生/持続/硬直/威力）', () => {
-    expect(CHAR_LIST.length).toBe(6);
+    expect(CHAR_LIST.length).toBe(7);
     for (const id of CHAR_LIST) {
       const d = CHARS[id];
       expect(d.hp).toBeGreaterThan(0);
@@ -118,12 +118,12 @@ describe('characters', () => {
     expect(st.fighters[1].hp).toBe(st.fighters[1].maxhp - d.dmg);
   });
 
-  it('セレクト: カーソルは6キャラを巡回・CPU は隣のキャラ', () => {
+  it('セレクト: カーソルは7キャラを巡回・CPU は隣のキャラ', () => {
     const st = createGame();
     frames(st, 1, GI({}, {}, true)); // → select
     expect(st.status).toBe('select');
     frames(st, 1, GI({ left: true }));
-    expect(st.sel[0]).toBe(5); // 左端(gopher)から巡回して gnu
+    expect(st.sel[0]).toBe(6); // 左端(gopher)から巡回して bun
     frames(st, 1, GI());
     frames(st, 1, GI({ right: true }));
     expect(st.sel[0]).toBe(0);
@@ -135,7 +135,7 @@ describe('characters', () => {
     expect(st.sel[0]).toBe(2);
     frames(st, 1, GI({ light: true }));
     expect(st.fighters[0].char).toBe('ferris');
-    expect(st.fighters[1].char).toBe('tux'); // 隣 (2+1)%6=3
+    expect(st.fighters[1].char).toBe('tux'); // 隣 (2+1)%7=3
   });
 
   it('DENO の DENO DEPLOY は上空から降る複数弾を生成し床で消える', () => {
