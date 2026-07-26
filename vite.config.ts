@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { defineConfig, type Plugin } from 'vitest/config';
-import { attachSignaling } from './server/signal';
+import netHandler from './api/net';
 
 /**
  * 開発時のみ: ブラウザから canvas の dataURL を POST すると .shots/ に PNG 保存。
@@ -29,21 +29,23 @@ function shotEndpoint(): Plugin {
 }
 
 /**
- * 開発時のみ: Vite dev サーバの http サーバーに Socket.IO シグナリングを相乗り。
- * **本番の server/index.ts と同じ attachSignaling を呼ぶ**ので dev と prod が一致。
+ * 開発時のみ: /api/net を Vite dev サーバ内で処理。
+ * **本番 Vercel の api/net.ts と同一ハンドラを呼ぶ**ので、dev と prod が完全一致。
  * これによりローカルの2タブでオンライン対戦フローを本番同等に検証できる。
  */
-function signalingDev(): Plugin {
+function netEndpoint(): Plugin {
   return {
-    name: 'signaling-dev',
+    name: 'net-endpoint',
     configureServer(server) {
-      if (server.httpServer) attachSignaling(server.httpServer);
+      server.middlewares.use('/api/net', (req, res) => {
+        void netHandler(req, res);
+      });
     },
   };
 }
 
 export default defineConfig({
-  plugins: [shotEndpoint(), signalingDev()],
+  plugins: [shotEndpoint(), netEndpoint()],
   // 純粋ロジックは DOM 非依存なので node 環境でテストできる（速い）
   test: {
     environment: 'node',

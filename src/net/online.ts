@@ -1,9 +1,8 @@
 // オンライン接続のオーケストレータ。
 // マッチング(create/join/quick) → WebRTC シグナリング → DataChannel 確立 まで面倒を見て、
 // ロックステップ用の { transport, localSide, seed } を返す。
-// シグナリングは常駐 Socket.IO サーバー（video-call と同型）。
 import type { Side } from '../core/types';
-import { SignalSocket } from './signal-socket';
+import { SignalClient } from './signal-client';
 import type { Transport } from './transport';
 import { channelTransport, createPeer, waitOpen } from './webrtc';
 
@@ -19,8 +18,6 @@ export interface OnlineHandle {
   close(): void;
 }
 
-interface Sig { kind: string; sdp?: string; candidate?: unknown; seed?: number }
-
 const makeSeed = (): number => ((Date.now() & 0xffffff) ^ (Math.floor(Math.random() * 0xffffffff))) | 1;
 
 /**
@@ -34,33 +31,23 @@ export async function connectOnline(
   onStatus: (s: string) => void,
   onRoom?: (roomId: string) => void,
 ): Promise<OnlineHandle> {
-  const sig = new SignalSocket();
+  const sig = new SignalClient();
 
   onStatus('マッチング中…');
-  const m = await sig.matchmake(kind, code);
-  if (!m.ok || !m.roomId) { sig.close(); throw new Error(m.error ?? 'マッチングに失敗しました'); }
+  const m = kind === 'create' ? await sig.create()
+    : kind === 'join' ? await sig.join(code ?? '')
+      : await sig.quickMatch();
+  if (!m.ok || !m.roomId) throw new Error(m.error ?? 'マッチングに失敗しました');
   const isHost = m.role === 'host';
   onRoom?.(m.roomId);
   onStatus(isHost ? `相手を待っています…（ルーム ${m.roomId}）` : '接続中…');
 
   const pc = createPeer();
   let seed = isHost ? makeSeed() : 0;
-
-  // 切断検知: 一時的な 'disconnected' は猶予（自動復帰を待つ）。'failed'/'closed' で終了。
   let alive = true;
-  let discTimer: ReturnType<typeof setTimeout> | null = null;
   pc.onconnectionstatechange = () => {
-    const s = pc.connectionState;
-    if (s === 'failed' || s === 'closed') { alive = false; }
-    else if (s === 'disconnected') {
-      if (!discTimer) discTimer = setTimeout(() => { if (pc.connectionState !== 'connected') alive = false; }, 8000);
-    } else if (s === 'connected') {
-      if (discTimer) { clearTimeout(discTimer); discTimer = null; }
-      alive = true;
-    }
+    if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) alive = false;
   };
-  // 相手がルームから抜けた（タブを閉じた等）
-  sig.onPeerLeft(() => { alive = false; });
 
   // ICE 候補は相手へ送る。remoteDescription 前に来た候補はバッファ。
   let remoteSet = false;
@@ -74,43 +61,42 @@ export async function connectOnline(
   let resolveCh!: (ch: RTCDataChannel) => void;
   const channelReady = new Promise<RTCDataChannel>((res) => { resolveCh = res; });
   if (isHost) {
-    resolveCh(pc.createDataChannel('game', { ordered: true }));
+    const ch = pc.createDataChannel('game', { ordered: true });
+    resolveCh(ch);
   } else {
     pc.ondatachannel = (e) => resolveCh(e.channel);
   }
 
-  // host: 相手入室で offer 生成（seed 同送）
+  // シグナル受信（オファー/アンサーは各1回だけ処理する）
   let offerSent = false;
-  const makeOffer = async (): Promise<void> => {
-    if (offerSent) return; offerSent = true;
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    sig.send({ kind: 'offer', sdp: offer.sdp, seed });
-  };
-  if (isHost) sig.onPeerJoined(() => { void makeOffer(); });
-
-  // シグナル受信
   let answered = false;
-  sig.onSignal(async (raw) => {
-    const s = raw as Sig;
+  sig.listen(async (s) => {
     try {
-      if (s.kind === 'offer' && !isHost && !answered) {
+      if (s.kind === 'peer-joined' && isHost && !offerSent) {
+        // guest 到着 → オファー生成（seed を同送）
+        offerSent = true;
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        sig.send({ kind: 'offer', sdp: offer.sdp, seed });
+      } else if (s.kind === 'offer' && !isHost && !answered) {
         answered = true;
         seed = (s.seed as number) ?? seed;
-        await pc.setRemoteDescription({ type: 'offer', sdp: s.sdp });
+        await pc.setRemoteDescription({ type: 'offer', sdp: s.sdp as string });
         remoteSet = true; await flushIce();
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         sig.send({ kind: 'answer', sdp: answer.sdp });
         onStatus('接続確立中…');
       } else if (s.kind === 'answer' && isHost && !remoteSet) {
-        await pc.setRemoteDescription({ type: 'answer', sdp: s.sdp });
+        await pc.setRemoteDescription({ type: 'answer', sdp: s.sdp as string });
         remoteSet = true; await flushIce();
         onStatus('接続確立中…');
       } else if (s.kind === 'ice') {
         const cand = s.candidate as RTCIceCandidateInit;
         if (remoteSet) { try { await pc.addIceCandidate(cand); } catch { /* ignore */ } }
         else pendingIce.push(cand);
+      } else if (s.kind === 'peer-left') {
+        // 接続前に相手が抜けた場合は待機継続（UI 側で扱う）
       }
     } catch (err) {
       console.error('signal handling error', err);
@@ -122,7 +108,8 @@ export async function connectOnline(
   // 相手が参加してコードを共有する時間を見込んで長め（Esc で中止可）
   await waitOpen(channel, 120_000);
   onStatus('接続完了');
-  // 接続後もシグナリングは開いたまま（peer-left 検知用）。close で切る。
+  // 接続確立後はシグナリングを閉じてよい（以後は P2P）
+  sig.close();
 
   return {
     transport: channelTransport(channel, pc),
@@ -130,6 +117,6 @@ export async function connectOnline(
     seed,
     roomId: m.roomId,
     alive: () => alive,
-    close: () => { if (discTimer) clearTimeout(discTimer); sig.close(); try { pc.close(); } catch { /* noop */ } },
+    close: () => { sig.close(); try { pc.close(); } catch { /* noop */ } },
   };
 }
