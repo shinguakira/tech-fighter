@@ -1,70 +1,68 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { _reset, createRoom, dispatch, joinRoom, poll, quickMatch, relay } from '../api/net';
+import { Rooms } from '../server/rooms';
 
-describe('マッチング/シグナリング（単一エンドポイント・ポーリング）', () => {
-  beforeEach(() => _reset());
+describe('マッチング/シグナリング（常駐サーバーの Rooms）', () => {
+  let rooms: Rooms;
+  // 決定論の擬似乱数（コード生成用）
+  beforeEach(() => {
+    let s = 12345;
+    rooms = new Rooms(() => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; });
+  });
 
-  it('createRoom: host が作成され、コードが返る', () => {
-    const r = createRoom('a');
+  it('create: host が作成され、コードが返る', () => {
+    const r = rooms.create('a');
     expect(r.ok).toBe(true);
     expect(r.role).toBe('host');
     expect(r.roomId).toMatch(/^[A-Z0-9]{4}$/);
+    expect(rooms.size()).toBe(1);
   });
 
-  it('joinRoom: guest 参加で2人に。満員は弾く', () => {
-    const host = createRoom('a');
-    const g = joinRoom(host.roomId!, 'b');
+  it('join: guest 参加で2人に。満員は弾く', () => {
+    const host = rooms.create('a');
+    const g = rooms.join(host.roomId, 'b');
     expect(g.ok).toBe(true);
-    expect(g.role).toBe('guest');
-    expect(joinRoom(host.roomId!, 'c').ok).toBe(false);
+    if (g.ok) expect(g.role).toBe('guest');
+    expect(rooms.join(host.roomId, 'c').ok).toBe(false);
   });
 
   it('存在しないコードは参加失敗', () => {
-    expect(joinRoom('ZZZZ', 'x').ok).toBe(false);
+    expect(rooms.join('ZZZZ', 'x').ok).toBe(false);
   });
 
-  it('quickMatch: 待機があれば参加、無ければ作成', () => {
-    const first = quickMatch('a');
+  it('quick: 待機があれば参加、無ければ作成', () => {
+    const first = rooms.quick('a');
     expect(first.role).toBe('host');
-    const second = quickMatch('b');
+    const second = rooms.quick('b');
     expect(second.role).toBe('guest');
     expect(second.roomId).toBe(first.roomId);
-    const third = quickMatch('c');
+    const third = rooms.quick('c');
     expect(third.role).toBe('host');
     expect(third.roomId).not.toBe(first.roomId);
   });
 
-  it('join で host に peer-joined が poll で届く', () => {
-    const host = createRoom('a');
-    joinRoom(host.roomId!, 'b');
-    const got = poll(host.roomId!, 'a');
-    expect(got.signals!.some((s) => s.kind === 'peer-joined' && s.from === 'b')).toBe(true);
+  it('peerOf: 同じルームの相手 socket を返す', () => {
+    const host = rooms.create('a');
+    rooms.join(host.roomId, 'b');
+    expect(rooms.peerOf('a')).toBe('b');
+    expect(rooms.peerOf('b')).toBe('a');
+    expect(rooms.peerOf('x')).toBeUndefined();
   });
 
-  it('relay: 相手にだけ届き、poll で取り出すと空になる', () => {
-    const host = createRoom('a');
-    joinRoom(host.roomId!, 'b');
-    poll(host.roomId!, 'a'); // peer-joined を消化
-    relay(host.roomId!, 'a', { kind: 'offer', sdp: 'X', seed: 42 });
-    const first = poll(host.roomId!, 'b');
-    const offer = first.signals!.find((s) => s.kind === 'offer');
-    expect(offer).toBeTruthy();
-    expect(offer!.seed).toBe(42);
-    expect(offer!.from).toBe('a');
-    // 送信者には届かない
-    expect(poll(host.roomId!, 'a').signals!.length).toBe(0);
-    // 2回目の poll は空（ドレイン済み）
-    expect(poll(host.roomId!, 'b').signals!.length).toBe(0);
+  it('leave: 退室で相手を返し、空室は破棄', () => {
+    const host = rooms.create('a');
+    rooms.join(host.roomId, 'b');
+    const left = rooms.leave('b');
+    expect(left.peer).toBe('a'); // 残った host を通知対象で返す
+    expect(rooms.peerOf('a')).toBeUndefined();
+    rooms.leave('a');
+    expect(rooms.size()).toBe(0); // 空室破棄
   });
 
-  it('dispatch: action で正しく分岐する', () => {
-    const c = dispatch({ action: 'create', playerId: 'a' });
-    expect(c.role).toBe('host');
-    const j = dispatch({ action: 'join', roomId: c.roomId, playerId: 'b' });
-    expect(j.role).toBe('guest');
-    dispatch({ action: 'signal', roomId: c.roomId, playerId: 'b', signal: { kind: 'ready' } });
-    const p = dispatch({ action: 'poll', roomId: c.roomId, playerId: 'a' });
-    expect(p.signals!.some((s) => s.kind === 'ready')).toBe(true);
-    expect(dispatch({ action: 'bogus' }).ok).toBe(false);
+  it('新しい matchmake で前のルームからは自動退室', () => {
+    const r1 = rooms.create('a');
+    rooms.create('a'); // 作り直し
+    // 前のルームは a が抜けて空 → 破棄
+    expect(rooms.size()).toBe(1);
+    expect(rooms.roomOf('a')?.id).not.toBe(r1.roomId);
   });
 });

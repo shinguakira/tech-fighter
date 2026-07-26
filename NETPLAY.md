@@ -1,73 +1,64 @@
 # ネット対戦（オンライン）
 
-決定論ロックステップ × WebRTC P2P。マッチング/シグナリングだけ **単一の Vercel 関数（in-memory＋ポーリング）** を使う。
+決定論ロックステップ × WebRTC P2P。マッチング/シグナリングは **常駐 Socket.IO サーバー**で行う
+（`../PoC/video-call` と同型）。サーバーレスの in-memory 問題を避けるため、シグナリングは
+**ずっと起きている 1 プロセス**が担う。
 
 ## 構成
 
 ```
-ブラウザA ──┐   POST /api/net  (create/join/quick-match/signal/poll・単一関数)   ┌── ブラウザB
-   │        └────────────────── Vercel Function (api/net.ts) ─────────────────┘        │
-   └───────────────── WebRTC DataChannel (P2P・60fpsの入力交換) ──────────────────────┘
+ブラウザA ──┐  Socket.IO (matchmake / signal 中継)  ┌── ブラウザB
+   │        └────── 常駐 Node サーバー (server/) ────┘        │
+   └──────────── WebRTC DataChannel (P2P・60fpsの入力交換) ──────────┘
 ```
 
-- **接続確立まで**だけサーバー（`POST /api/net`）を経由（SDP/ICE を数通中継）。相手待ちはポーリングで受信。
-- **対戦中はサーバーを一切通さず** P2P。両クライアントが同じ入力列から `step()` を回すので画面は常に一致（`src/net/session.ts`）。
-- 入力ディレイ 3 フレーム（約 50ms）で遅延を吸収。
-
-### Vercel 制約への対応（重要）
-Vercel のサーバーレスは**状態を持てない**（呼び出し毎に別インスタンスになり得る）。それでも動くように:
-- **全操作を単一関数 `api/net.ts` に統合**（別関数だとメモリを共有できない）。
-- **SSE をやめてポーリング**（接続を掴みっぱなしにせず、サーバーレスと相性が良い）。
-- **自己完結・生の Node req/res**（外部 import やフレームワーク拡張に依存せず、関数が落ちない）。
-- dev（`vite.config.ts`）も**同じ `api/net.ts` ハンドラ**を呼ぶので、ローカル＝本番。
+- **接続確立まで**だけ Socket.IO サーバーを経由（SDP/ICE を数通中継）。**対戦中はサーバー非経由の P2P**。
+- 両クライアントが同じ入力列から `step()` を回すので画面は常に一致（`src/net/session.ts`）。入力ディレイ 3 フレーム。
+- **なぜ Socket.IO（常駐）か**: Vercel 等のサーバーレスは呼び出し毎に別インスタンスになり得て、
+  in-memory のルームが噛み合わず「マッチングできない」。常駐プロセスなら1箇所で状態を持てるので確実。
+  （この判断は video-call PoC の実装＝ Socket.IO in-memory 常駐に倣った）
+- **切断対策**: WebRTC の一時的な `disconnected` は 8 秒猶予して自動復帰を待つ（即終了しない）。
+  相手のタブが閉じたら Socket.IO の `peer-left` で検知。
+- **TURN は未設定**（video-call と同条件）。同一/良回線なら STUN のみで繋がる。対称NAT 等の一部回線を
+  確実にしたい場合のみ `src/net/webrtc.ts` の `iceServers` に TURN を足す。
 
 ## ファイル
 
-- `api/net.ts` — **マッチング＋シグナリングの単一関数**（Vercel も dev も同一）。in-memory ルーム＋ポーリング。
-- `src/net/session.ts` — ロックステップ中核（トランスポート非依存）。
-- `src/net/transport.ts` — `Transport` 抽象＋テスト用ループバック。
-- `src/net/webrtc.ts` — `RTCDataChannel` を `Transport` 化。
-- `src/net/signal-client.ts` — `/api/net` クライアント（fetch＋ポーリング）。
+- `server/rooms.ts` — ルーム管理コア（ソケット非依存・テスト対象）。
+- `server/signal.ts` — `attachSignaling(httpServer)`。Socket.IO を http サーバーに相乗り（dev/prod 共通）。
+- `server/index.ts` — 本番の常駐サーバー。`dist/` を配信しつつ同一プロセスで Socket.IO を動かす。
+- `src/net/signal-socket.ts` — クライアント（socket.io-client）。
 - `src/net/online.ts` — マッチング→シグナリング→WebRTC 確立のオーケストレータ。
-- `src/net/online-ui.ts` — ロビー/接続/対戦の状態機械＋オーバーレイ描画（配線層）。
-- `vite.config.ts` の `netEndpoint` — dev で `api/net.ts` を配線（ローカル2タブ検証用）。
+- `src/net/{session,transport,webrtc}.ts` — ロックステップ／トランスポート／WebRTC。
+- `src/net/online-ui.ts` — ロビー/接続/対戦の状態機械＋オーバーレイ。
+- `vite.config.ts` の `signalingDev` — dev サーバに同じ `attachSignaling` を相乗り（ローカル2タブ検証用）。
 
 ## 遊び方
 
-タイトル →「オンライン対戦」→
-- **Q** クイックマッチ（待機中の相手と自動マッチング）
-- **R** ルーム作成（表示コードを相手に共有）
-- **F** ルーム参加（コード入力）
+タイトル →「オンライン対戦」→ **Q** クイックマッチ / **R** ルーム作成 / **F** ルーム参加。
+操作は両者とも 1P と同じ（WASD＋JKL、スマホはオンスクリーン）。`Esc` で退出。
 
-操作は両者とも 1P と同じ（WASD＋JKL）。`Esc` で退出。
+## デプロイ
 
-## Vercel デプロイ（最小手順）
+### 推奨: サーバー一体（1デプロイ）
+フロント配信＋シグナリングを 1 つの常駐サーバーで動かす。**Render / Fly.io / Railway** の無料枠へ。
 
-Vite 静的サイト＋`api/net.ts` の1関数だけ。**外部サービス不要**。
-
-1. GitHub にプッシュ。
-2. Vercel で "New Project" → リポジトリを import。
-3. Framework は自動で **Vite** 判定（`vercel.json` で明示済み）。そのまま Deploy。
-   - 静的ビルド = `dist/`、`/api/net` は Node サーバーレス関数として自動デプロイ。
-4. 発行された URL を2人で開けば対戦可能。
-
-CLI なら:
+- ビルド: `npm ci && npm run build:prod`（`dist/` を生成）
+- 起動: `npm start`（`server/index.ts` が `dist/` 配信＋Socket.IO）
+- Render は同梱の `render.yaml` で Blueprint デプロイ可（`/healthz` でヘルスチェック）。
 
 ```bash
-npm i -g vercel
-vercel        # プレビュー
-vercel --prod # 本番
+npm run build:prod && npm start   # ローカル本番相当（http://localhost:3000）
 ```
 
-## 既知の制約（正直に）
+### フロントを Vercel に置く場合（2デプロイ）
+- 常駐サーバーだけ Render 等にデプロイ。
+- フロントは Vercel（`vercel.json` の静的ビルド）。ビルド時に **`VITE_SIGNALING_URL`** を
+  常駐サーバーの URL に設定（`.env.local.example` 参照）。
 
-- **Vercel の状態共有**: サーバーレスは状態を持てないので、**稀に2人が別インスタンスに載るとルームが噛み合わない**。
-  低トラフィック（2人・数秒の接続窓）なら実際は同一インスタンスに載りやすく実用上ほぼ動くが、**100%の保証はできない**。
-  確実に固めたい場合の唯一の方法は「関数の外に状態を置く」＝共有ストア（Vercel KV 等）か永続サーバー。
-  その場合は `api/net.ts` の `ROOMS`（in-memory）をストアに差し替えるだけ（ロジックはそのまま）。
-- **ルーム作成（R）の方がクイックマッチ（Q）より安定**: create→共有→join は数秒の逐次アクセスで同一インスタンスに載りやすい。
-  クイックマッチは2人同時アクセスで別インスタンスになる可能性がやや高い。
-- **WebRTC の NAT 越え**: STUN（Google 無料）で大半つながる。対称 NAT 等で失敗する場合は
-  `src/net/webrtc.ts` の `iceServers` に TURN を追加（Metered などの無料枠）。
-- **ネットコード**: ディレイ式ロックステップ（相手入力が届くまで待つ）。地域内なら快適。
-  体感向上にはロールバックへ拡張可能（状態がシリアライズ可能なので実装可能）。
+## 既知の制約
+
+- **TURN 無し**: 対称NAT／一部モバイル・企業ネットワークは P2P 直結できず接続不可（TURN で解決）。
+- **無料の常駐ホストはアイドルでスリープする場合がある**（Render 無料等）。初回接続時に数十秒の
+  起床待ちが出ることがある。
+- **ネットコード**: ディレイ式ロックステップ。地域内なら快適。体感向上にはロールバックへ拡張可能。

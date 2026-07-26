@@ -48,9 +48,11 @@ Gopher / Duke / Ferris / Tux / Deno / GNU が戦う 2D 格闘ゲーム。単一 
 - `src/audio/sound.ts` — Web Audio の**手続き合成**（音源ファイル無し）。core は無音のまま、`sound.update(state)` が
   GameState の差分（被弾/ガード/技発生/飛び道具/ジャンプ/ゲージMAX/KO/画面遷移）を観測して SFX を鳴らし、
   BGM（ベース＋リードの16ステップループ）の音量を状況で調整。Backquote(`) でミュート。
-- `src/net/` — **オンライン対戦**（決定論ロックステップ × WebRTC P2P）。core は無改造で、
-  各クライアントが同じ入力列から `step()` を回して同期。マッチング/シグナリングは **単一関数 `api/net.ts`**
-  （in-memory＋ポーリング。dev も `vite.config.ts` から同じハンドラを呼ぶ＝本番一致）。詳細は `NETPLAY.md`。
+- `src/net/` + `server/` — **オンライン対戦**（決定論ロックステップ × WebRTC P2P）。core は無改造で、
+  各クライアントが同じ入力列から `step()` を回して同期。マッチング/シグナリングは **常駐 Socket.IO サーバー**
+  （`server/` = video-call PoC 同型。Vercel サーバーレスの in-memory 不整合を避けるため永続プロセスにする）。
+  dev は `vite.config.ts` が同じ `attachSignaling` を相乗り、本番は `server/index.ts`（dist 配信＋Socket.IO、
+  Render/Fly 等へ `npm start`）。詳細は `NETPLAY.md`。
 - `src/main.ts` — 配線（rAF: input → step → sound.update → render。オンライン中は OnlineController が駆動）。
 
 ## コマンド

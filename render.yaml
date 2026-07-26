@@ -1,0 +1,14 @@
+# Render 用ブループリント（1クリックデプロイ）。
+# フロント配信＋Socket.IO シグナリングを1つの常駐 Node サーバーで動かす。
+# 使い方: GitHub に push → Render で "New +" → "Blueprint" → このリポジトリを選ぶ。
+services:
+  - type: web
+    name: tech-fighter
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build:prod
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
