@@ -50,7 +50,8 @@ Gopher / Duke / Ferris / Tux / Deno / GNU が戦う 2D 格闘ゲーム。単一 
   BGM（ベース＋リードの16ステップループ）の音量を状況で調整。Backquote(`) でミュート。
 - `src/net/` — **オンライン対戦**（決定論ロックステップ × WebRTC P2P）。core は無改造で、
   各クライアントが同じ入力列から `step()` を回して同期。マッチング/シグナリングは **単一関数 `api/net.ts`**
-  （in-memory＋ポーリング。dev も `vite.config.ts` から同じハンドラを呼ぶ＝本番一致）。詳細は `NETPLAY.md`。
+  （状態は Upstash Redis＝Vercel Storage 統合／ポーリング。dev も `vite.config.ts` から同じハンドラを呼ぶ＝本番一致）。
+  詳細は `NETPLAY.md`。
 - `src/main.ts` — 配線（rAF: input → step → sound.update → render。オンライン中は OnlineController が駆動）。
 
 ## コマンド
