@@ -50,7 +50,17 @@ export interface RedisLike {
 
 let redis: RedisLike | null = null;
 function db(): RedisLike {
-  if (!redis) redis = Redis.fromEnv() as unknown as RedisLike;
+  if (!redis) {
+    const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+    const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+    if (!url || !token) {
+      throw new Error(
+        'Redis未接続: 環境変数 UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN が見つかりません。'
+        + ' Vercel の Storage タブで Redis を接続するか、ローカルなら `vercel env pull .env.local` を実行してください。',
+      );
+    }
+    redis = new Redis({ url, token }) as unknown as RedisLike;
+  }
   return redis;
 }
 /** テスト用: Redis 実装を差し替える（in-memory フェイク等）。 */

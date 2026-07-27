@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { defineConfig, type Plugin } from 'vitest/config';
+import { loadEnv, type Plugin } from 'vite';
+import { defineConfig } from 'vitest/config';
 import netHandler from './api/net';
 
 /**
@@ -44,11 +45,16 @@ function netEndpoint(): Plugin {
   };
 }
 
-export default defineConfig({
-  plugins: [shotEndpoint(), netEndpoint()],
-  // 純粋ロジックは DOM 非依存なので node 環境でテストできる（速い）
-  test: {
-    environment: 'node',
-    include: ['tests/**/*.test.ts'],
-  },
+export default defineConfig(({ mode }) => {
+  // .env.local 等を process.env にも反映する（api/net.ts が process.env.UPSTASH_* を
+  // 直接読むため。Vite は既定では VITE_ プレフィックス以外を process.env に流さない）。
+  Object.assign(process.env, loadEnv(mode, process.cwd(), ''));
+  return {
+    plugins: [shotEndpoint(), netEndpoint()],
+    // 純粋ロジックは DOM 非依存なので node 環境でテストできる（速い）
+    test: {
+      environment: 'node',
+      include: ['tests/**/*.test.ts'],
+    },
+  };
 });
